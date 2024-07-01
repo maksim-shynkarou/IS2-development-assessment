@@ -1,6 +1,7 @@
 ﻿using DataExporter.Dtos;
-using DataExporter.Services;
+using DataExporter.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace DataExporter.Controllers
 {
@@ -8,37 +9,44 @@ namespace DataExporter.Controllers
     [Route("[controller]")]
     public class PoliciesController : ControllerBase
     {
-        private PolicyService _policyService;
+        private IPolicyService _policyService;
 
-        public PoliciesController(PolicyService policyService) 
+        public PoliciesController(IPolicyService policyService) 
         { 
             _policyService = policyService;
         }
 
         [HttpPost]
-        public async Task<IActionResult> PostPolicies([FromBody]CreatePolicyDto createPolicyDto)
-        {         
-            return Ok();
+        [SwaggerResponse(StatusCodes.Status201Created, Type = typeof(ReadPolicyDto))]
+        public async Task<IActionResult> PostPolicies([FromBody]CreatePolicyDto createPolicyDto, CancellationToken cancellationToken)
+        {
+            var response = await _policyService.CreatePolicyAsync(createPolicyDto, cancellationToken);
+            return CreatedAtRoute(nameof(GetPolicy), new { id = response!.Id }, response);
         }
-
 
         [HttpGet]
-        public async Task<IActionResult> GetPolicies()
+        [SwaggerResponse(StatusCodes.Status200OK, Type = typeof(IEnumerable<ReadPolicyDto>))]
+        public async Task<IActionResult> GetPolicies(CancellationToken cancellationToken)
         {
-            return Ok();
+            return Ok(await _policyService.ReadPoliciesAsync(null, cancellationToken));
         }
 
-        [HttpGet("{policyId}")]
-        public async Task<IActionResult> GetPolicy(int id)
+        [HttpGet("{id}", Name = nameof(GetPolicy))]
+        [SwaggerResponse(StatusCodes.Status200OK, Type = typeof(ReadPolicyDto))]
+        [SwaggerResponse(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetPolicy(int id, CancellationToken cancellationToken)
         {
-            return Ok(_policyService.ReadPolicyAsync(id));
+            var policy = await _policyService.ReadPolicyAsync(id, cancellationToken);
+
+            return policy is not null ? Ok(policy) : NotFound();
         }
 
 
         [HttpPost("export")]
-        public async Task<IActionResult> ExportData([FromQuery]DateTime startDate, [FromQuery] DateTime endDate)
+        [SwaggerResponse(StatusCodes.Status200OK, Type = typeof(IEnumerable<ReadPolicyDto>))]
+        public async Task<IActionResult> ExportData([FromQuery]DateTime startDate, [FromQuery] DateTime endDate, CancellationToken cancellationToken)
         {
-            return Ok();
+            return Ok(await _policyService.ReadPoliciesAsync(new Models.ReadPoliciesFilterRequest { StartDate = startDate, EndDate = endDate}, cancellationToken));
         }
     }
 }
